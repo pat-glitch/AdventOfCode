@@ -11,11 +11,16 @@ import (
 
 // Function to check if a row is "safe"
 func isSafeRow(row []int) bool {
+	if len(row) < 2 {
+		return true // Rows with fewer than 2 numbers are automatically safe
+	}
+
 	increasing, decreasing := true, true
 
 	for i := 0; i < len(row)-1; i++ {
 		diff := int(math.Abs(float64(row[i+1] - row[i])))
 		if diff < 1 || diff > 3 {
+			fmt.Printf("Unsafe due to difference at index %d: %d to %d\n", i, row[i], row[i+1])
 			return false // Unsafe: differences not in [1, 3]
 		}
 		if row[i] < row[i+1] {
@@ -26,6 +31,9 @@ func isSafeRow(row []int) bool {
 	}
 
 	// Unsafe if not monotonic
+	if !(increasing || decreasing) {
+		fmt.Println("Unsafe due to non-monotonic order")
+	}
 	return increasing || decreasing
 }
 
@@ -35,6 +43,7 @@ func canBeSafeByRemovingOne(row []int) bool {
 		// Create a temporary slice excluding the i-th number
 		temp := append(row[:i], row[i+1:]...)
 		if isSafeRow(temp) {
+			fmt.Printf("Row is safe by removing number %d\n", row[i])
 			return true
 		}
 	}
@@ -68,6 +77,9 @@ func processFile(filename string) {
 			}
 			row[i] = num
 		}
+
+		// Debug print row
+		fmt.Printf("Processing row: %v\n", row)
 
 		// Check if the row is safe
 		if isSafeRow(row) {
