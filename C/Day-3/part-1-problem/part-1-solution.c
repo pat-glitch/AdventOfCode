@@ -1,48 +1,76 @@
 #include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <ctype.h>
+#include <stdbool.h>
 
-// Function to validate and process a "mul(x,y)" substring
-int process_mul_substring(const char *start, int *product) {
-    int x, y;
-    // Parse the substring for the "mul(x,y)" format
-    if (sscanf(start, "mul(%d,%d)", &x, &y) == 2) {
-        // Check that both x and y are 1-3 digit integers
-        if (x >= 0 && x <= 999 && y >= 0 && y <= 999) {
-            *product = x * y;
-            return 1;
-        }
+#define FNAME "inputdata.txt"     // Path to input file
+#define FSIZE (5 << 12)       // 20480 bytes (input file size limit)
+
+// Instruction identifiers (32-bit little-endian integers)
+#define MUL  0x286c756d       // *(int *)"mul("
+#define DO   0x29286f64       // *(int *)"do()"
+#define DON  0x276e6f64       // *(int *)"don'"
+#define DONT 0x00292874       // *(int *)"t()"
+#define MASK ((1 << 24) - 1)  // Mask for matching "t()" (ignores MSB)
+
+// Input buffer
+static char input[FSIZE];
+
+// Function to parse 1-3 digit positive integers
+static int num(const char **const c, const char sep) {
+    if (**c < '1' || **c > '9')  // Positive numbers must start with 1-9
+        return 0;
+    int x = *(*c)++ & 15;        // Parse the first digit
+    for (int i = 0; i < 2 && **c >= '0' && **c <= '9'; ++i) // Parse up to 2 more digits
+        x = x * 10 + (*(*c)++ & 15);
+    if (**c == sep) {            // Check if the next character is the separator
+        ++(*c);                  // Move past the separator
+        return x;
     }
-    return 0;
+    return 0;                    // Return 0 if parsing fails
 }
 
-int main() {
-    FILE *file = fopen("inputdata.txt", "r");
-    if (!file) {
-        perror("Error opening file");
+int main(void) {
+    // Open the input file
+    FILE *f = fopen(FNAME, "rb");
+    if (!f) {
+        fputs("File not found.\n", stderr);
         return 1;
     }
+    fread(input, sizeof(input), 1, f);  // Read entire file into memory
+    fclose(f);
 
-    char line[4096];
-    int total_sum = 0;
+    int sum1 = 0, sum2 = 0, a, b;
+    bool enabled = true;  // Multiplications are enabled at the start
 
-    while (fgets(line, sizeof(line), file)) {
-        char *ptr = line;
-        while (*ptr) {
-            // Look for "mul(" in the current substring
-            if (strncmp(ptr, "mul(", 4) == 0) {
-                int product = 0;
-                if (process_mul_substring(ptr, &product)) {
-                    total_sum += product;
-                }
+    // Parse the input
+    for (const char *c = input; *c; ) {
+        switch (*(int *)c) {  // Match first four characters as a 32-bit integer
+        case MUL:  // "mul("
+            c += 4;
+            if ((a = num(&c, ',')) && (b = num(&c, ')'))) {  // Parse x and y
+                const int mul = a * b;
+                sum1 += mul;            // Always add to sum1
+                sum2 += mul * enabled; // Add to sum2 only if enabled
             }
-            ptr++; // Move to the next character
+            break;
+        case DO:  // "do()"
+            c += 4;
+            enabled = true;  // Enable future multiplications
+            break;
+        case DON:  // "don'"
+            c += 4;
+            if ((*(int *)c & MASK) == DONT) {  // Match "t()" using the mask
+                c += 3;
+                enabled = false;  // Disable future multiplications
+            }
+            break;
+        default:  // Skip unrecognized characters
+            ++c;
         }
     }
 
-    fclose(file);
+    // Print results
+    printf("Sum1: %d\n", sum1);  // Total sum of all mul(x,y)
+    printf("Sum2: %d\n", sum2);  // Total sum of enabled mul(x,y)
 
-    printf("Total Sum of all valid mul(x,y): %d\n", total_sum);
     return 0;
 }
