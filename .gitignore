@@ -1,8 +1,0 @@
-# Ignore all .txt files in the root directory
-*.txt
-
-# Ignore the files in .vscode directory
-.vscode/*
-
-
-
