@@ -1,2 +1,5 @@
 #ignore all the .txt files
 *.txt
+
+#ignore all the build files
+*.exe
