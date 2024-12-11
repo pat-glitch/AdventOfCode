@@ -29,17 +29,16 @@ func main() {
 		stones = append(stones, num)
 	}
 
-	// Perform 75 blinks with aggressive optimization
+	// Perform 25 blinks
 	for blink := 0; blink < 75; blink++ {
-		newStones := make([]int, 0, len(stones)*3) // Estimate exponential growth
+		var newStones []int
 		for _, stone := range stones {
-			switch {
-			case stone == 0:
+			if stone == 0 {
 				newStones = append(newStones, 1)
-			case isEvenDigits(stone):
-				left, right := splitDigitsDirect(stone)
+			} else if isEvenDigits(stone) {
+				left, right := splitDigits(stone)
 				newStones = append(newStones, left, right)
-			default:
+			} else {
 				newStones = append(newStones, stone*2024)
 			}
 		}
@@ -49,7 +48,7 @@ func main() {
 	fmt.Println("Number of stones after 75 blinks:", len(stones))
 }
 
-// Check if a number has an even number of digits directly
+// Check if a number has an even number of digits
 func isEvenDigits(num int) bool {
 	digits := 0
 	for num > 0 {
@@ -59,26 +58,24 @@ func isEvenDigits(num int) bool {
 	return digits%2 == 0
 }
 
-// Split the digits of a number directly without conversion
-func splitDigitsDirect(num int) (int, int) {
-	// Count total digits
-	digits := 0
-	temp := num
-	for temp > 0 {
-		digits++
-		temp /= 10
+// Split the digits of a number in half
+func splitDigits(num int) (int, int) {
+	digits := []int{}
+	for num > 0 {
+		digits = append([]int{num % 10}, digits...)
+		num /= 10
 	}
+	mid := len(digits) / 2
 
-	// Split point
-	mid := digits / 2
-
-	// Calculate left and right parts
-	left, right, divider := 0, 0, 1
+	left := 0
 	for i := 0; i < mid; i++ {
-		divider *= 10
+		left = left*10 + digits[i]
 	}
-	left = num / divider
-	right = num % divider
+
+	right := 0
+	for i := mid; i < len(digits); i++ {
+		right = right*10 + digits[i]
+	}
 
 	return left, right
 }
