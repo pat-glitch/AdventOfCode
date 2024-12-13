@@ -1,120 +1,138 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
 
-#define OFFSET 10000000000000LL
+#define MAX_LINE_LENGTH 100
 
-// Struct to represent coordinates
+// ButtonMove represents the movement of a button
 typedef struct {
-    int64_t x;
-    int64_t y;
-} Coord;
+  char name;
+  int tokenCost;
+  int xMove;
+  int yMove;
+} ButtonMove;
 
-// Function to parse input file
-int parseInputFile(const char *filename, int64_t ****data, size_t *groupCount) {
-    FILE *file = fopen(filename, "r");
-    if (!file) {
-        perror("Error opening file");
-        return -1;
-    }
+// Machine represents a single claw machine
+typedef struct {
+  ButtonMove buttonA;
+  ButtonMove buttonB;
+  int prizeX;
+  int prizeY;
+} Machine;
 
-    char line[256];
-    int64_t ***tempData = NULL;
-    size_t tempGroupCount = 0;
-    int64_t **currentGroup = NULL;
-    size_t currentGroupSize = 0;
-
-    while (fgets(line, sizeof(line), file)) {
-        // Remove newline character
-        line[strcspn(line, "\n")] = '\0';
-
-        // Skip empty lines
-        if (strlen(line) == 0) {
-            continue;
-        }
-
-        // Extract numbers from the line
-        int64_t *numbers = NULL;
-        size_t matchCount = 0;
-        char *token = strtok(line, " 	");
-
-        while (token) {
-            int64_t num;
-            if (sscanf(token, "%lld", &num) == 1) {
-                numbers = realloc(numbers, (matchCount + 1) * sizeof(int64_t));
-                numbers[matchCount++] = num;
-            }
-            token = strtok(NULL, " 	");
-        }
-
-        // Add numbers to current group
-        currentGroup = realloc(currentGroup, (currentGroupSize + 1) * sizeof(int64_t *));
-        currentGroup[currentGroupSize++] = numbers;
-
-        // If the group has 3 lines, finalize it
-        if (currentGroupSize == 3) {
-            tempData = realloc(tempData, (tempGroupCount + 1) * sizeof(int64_t **));
-            tempData[tempGroupCount++] = currentGroup;
-
-            currentGroup = NULL;
-            currentGroupSize = 0;
-        }
-    }
-
-    fclose(file);
-
-    // Assign results
-    *data = tempData;
-    *groupCount = tempGroupCount;
-    return 0;
-}
+// Function prototypes
+int gcd(int a, int b);
+int calculateMinTokens(Machine machine);
+Machine parseMachineFromFile(FILE* file);
 
 int main() {
-    int64_t ***data;
-    size_t groupCount;
+  FILE* inputFile = fopen("inputdata.txt", "r");
+  if (inputFile == NULL) {
+    printf("Error opening input file!\n");
+    return 1;
+  }
 
-    if (parseInputFile("inputdata.txt", &data, &groupCount) != 0) {
-        fprintf(stderr, "Error parsing input file\n");
-        return 1;
-    }
+  Machine machine;
+  int totalTokens = 0;
+  while ((machine = parseMachineFromFile(inputFile)).prizeX != 0) { // Check if prizeX is 0 (indicating end of file)
+    int tokens = calculateMinTokens(machine);
+    printf("Machine - Minimum tokens: %d\n", tokens);
+    totalTokens += tokens;
+  }
 
-    int64_t total = 0;
+  printf("\nTotal minimum tokens for all machines: %d\n", totalTokens);
 
-    for (size_t i = 0; i < groupCount; ++i) {
-        Coord a = {data[i][0][0], data[i][0][1]};
-        Coord b = {data[i][1][0], data[i][1][1]};
-        Coord c = {data[i][2][0] + OFFSET, data[i][2][1] + OFFSET};
-
-        int64_t a1 = a.x, b1 = b.x, c1 = -c.x;
-        int64_t a2 = a.y, b2 = b.y, c2 = -c.y;
-
-        int64_t x = b1 * c2 - c1 * b2;
-        int64_t y = c1 * a2 - a1 * c2;
-        int64_t z = a1 * b2 - b1 * a2;
-
-        if (z == 0 || x % z != 0 || y % z != 0) {
-            continue;
-        }
-
-        x /= z;
-        y /= z;
-
-        if (x >= 0 && y >= 0) {
-            total += x * 3 + y;
-        }
-    }
-
-    printf("%lld\n", total);
-
-    // Free allocated memory
-    for (size_t i = 0; i < groupCount; ++i) {
-        for (size_t j = 0; j < 3; ++j) {
-            free(data[i][j]);
-        }
-        free(data[i]);
-    }
-    free(data);
-
-    return 0;
+  fclose(inputFile);
+  return 0;
 }
+
+// gcd calculates the Greatest Common Divisor using Euclidean algorithm
+int gcd(int a, int b) {
+  while (b != 0) {
+    int t = b;
+    b = a % b;
+    a = t;
+  }
+  return a;
+}
+
+// calculateMinTokens finds the minimum tokens to reach the prize
+int calculateMinTokens(Machine machine) {
+  int minTokens = 2147483647; // Maximum value for an integer (32-bit signed)
+
+  // Use GCD to optimize the search space
+  int gcdX = gcd(machine.buttonA.xMove, machine.buttonB.xMove);
+  int gcdY = gcd(machine.buttonA.yMove, machine.buttonB.yMove);
+
+  // Determine maximum reasonable search iterations using GCD
+  int maxIterations = (machine.prizeX / gcdX + machine.prizeY / gcdY) * 2;
+
+  for (int a = 0; a <= maxIterations; a++) {
+    for (int b = 0; b <= maxIterations; b++) {
+      // Calculate total X and Y movements
+      int totalX = a * machine.buttonA.xMove + b * machine.buttonB.xMove;
+      int totalY = a * machine.buttonA.yMove + b * machine.buttonB.yMove;
+
+      // Check if we've reached the prize exactly
+      if (totalX == machine.prizeX && totalY == machine.prizeY) {
+        // Calculate total tokens spent
+        int tokens = a * machine.buttonA.tokenCost + b * machine.buttonB.tokenCost;
+
+        // Update minimum tokens if found
+        minTokens = tokens < minTokens ? tokens : minTokens;
+      }
+    }
+  }
+
+  // If no solution found
+  if (minTokens == 2147483647) {
+    printf("No solution found for machine with prize X=%d, Y=%d\n", machine.prizeX, machine.prizeY);
+    return 0;
+  }
+
+  return minTokens;
+}
+
+// parseMachineFromFile reads a single machine configuration from the file
+Machine parseMachineFromFile(FILE* file) {
+  Machine machine = {0}; // Initialize all fields to 0
+
+  char line[MAX_LINE_LENGTH];
+  int numLinesRead = 0;
+
+  while (fgets(line, MAX_LINE_LENGTH, file) != NULL && numLinesRead < 3) {
+    if (line[0] == '\n' || line[0] == '\r') {
+      continue; // Skip empty lines
+    }
+
+    // Parse Button A
+    if (strstr(line, "Button A: X+") != NULL) {
+      sscanf(line, "Button A: X+%d, Y+%d", &machine.buttonA.xMove, &machine.buttonA.yMove);
+      machine.buttonA.name = 'A';
+      machine.buttonA.tokenCost = 3;
+    }
+
+    // Parse Button B
+    if (strstr(line, "Button B: X+") != NULL) {
+      sscanf(line, "Button B: X+%d, Y+%d", &machine.buttonB.xMove, &machine.buttonB.yMove);
+      machine.buttonB.name = 'B';
+      machine.buttonB.tokenCost = 1;
+    }
+
+    // Parse Prize
+    if (strstr(line, "Prize: X=") != NULL) {
+      sscanf(line, "Prize: X=%d, Y=%d", &machine.prizeX, &machine.prizeY);
+    }
+
+    numLinesRead++;
+  }
+
+  // If all three lines for a machine were read, return the machine
+  if (numLinesRead == 3) {
+    return machine;
+  } else {
+    // If less than 3 lines were read, it means we reached the end of the file
+    machine.prizeX = 0; // Set prizeX to 0 to signal end of file
+    return machine; 
+  }
+}as
