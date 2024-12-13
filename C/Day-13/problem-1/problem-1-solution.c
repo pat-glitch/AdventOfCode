@@ -135,4 +135,4 @@ Machine parseMachineFromFile(FILE* file) {
     machine.prizeX = 0; // Set prizeX to 0 to signal end of file
     return machine; 
   }
-}as
+}
