@@ -3,103 +3,125 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"strings"
 )
 
-// Room dimensions
 const (
-	width  = 101
-	height = 103
+	RoomWidth   = 101
+	RoomHeight  = 103
+	TimeElapsed = 100
 )
 
-// Robot structure
 type Robot struct {
-	posX, posY int
-	velX, velY int
+	x, y   int // Position as grid coordinates
+	vx, vy int // Velocity in tiles per second
 }
 
-// Parse input data and return a slice of Robots
-func parseInput(filePath string) ([]Robot, error) {
-	var robots []Robot
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		parts := strings.Fields(line)
-		pos := strings.Split(parts[0][2:], ",")
-		vel := strings.Split(parts[1][2:], ",")
-
-		posX, _ := strconv.Atoi(pos[0])
-		posY, _ := strconv.Atoi(pos[1])
-		velX, _ := strconv.Atoi(vel[0])
-		velY, _ := strconv.Atoi(vel[1])
-
-		robots = append(robots, Robot{posX, posY, velX, velY})
-	}
-
-	return robots, scanner.Err()
+func (r *Robot) UpdatePosition() {
+	// Move discretely for 100 seconds
+	r.x = discreteWrap(r.x+r.vx*TimeElapsed, RoomWidth)
+	r.y = discreteWrap(r.y+r.vy*TimeElapsed, RoomHeight)
 }
 
-// Compute robot's position after given seconds with wrapping
-func computePosition(robot Robot, seconds int) (int, int) {
-	x := (robot.posX + robot.velX*seconds) % width
-	y := (robot.posY + robot.velY*seconds) % height
-	if x < 0 {
-		x += width
+// Discrete wrapping function for grid-based movement
+func discreteWrap(pos, size int) int {
+	// Handle wrapping for both positive and negative velocities
+	for pos < 0 {
+		pos += size
 	}
-	if y < 0 {
-		y += height
-	}
-	return x, y
+	return pos % size
 }
 
-// Determine the quadrant of a position
 func determineQuadrant(x, y int) int {
-	if x == width/2 && y == height/2 {
-		return 0 // Middle point, not counted
+	// Exclude middle lines exactly
+	if x == RoomWidth/2 || y == RoomHeight/2 {
+		return -1 // Not in any quadrant
 	}
-	if x < width/2 && y < height/2 {
-		return 1 // Top-left
+
+	// Quadrant numbering:
+	// 0 | 1
+	// -----
+	// 2 | 3
+	if x < RoomWidth/2 && y < RoomHeight/2 {
+		return 0
+	} else if x > RoomWidth/2 && y < RoomHeight/2 {
+		return 1
+	} else if x < RoomWidth/2 && y > RoomHeight/2 {
+		return 2
+	} else {
+		return 3
 	}
-	if x >= width/2 && y < height/2 {
-		return 2 // Top-right
-	}
-	if x < width/2 && y >= height/2 {
-		return 3 // Bottom-left
-	}
-	return 4 // Bottom-right
 }
 
 func main() {
-	// Read robots from input file
-	robots, err := parseInput("inputdata.txt")
+	// Read input from file
+	file, err := os.Open("inputdata.txt")
 	if err != nil {
-		fmt.Println("Error reading input file:", err)
-		return
+		log.Fatal("Error opening input file:", err)
+	}
+	defer file.Close()
+
+	var robots []Robot
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.Split(line, " ")
+
+		// Parse position
+		pParts := strings.Split(strings.TrimPrefix(parts[0], "p="), ",")
+		x, _ := strconv.Atoi(pParts[0])
+		y, _ := strconv.Atoi(pParts[1])
+
+		// Parse velocity
+		vParts := strings.Split(strings.TrimPrefix(parts[1], "v="), ",")
+		vx, _ := strconv.Atoi(vParts[0])
+		vy, _ := strconv.Atoi(vParts[1])
+
+		robots = append(robots, Robot{
+			x:  x,
+			y:  y,
+			vx: vx,
+			vy: vy,
+		})
 	}
 
-	// Quadrant counters
-	quadrantCounts := make(map[int]int)
+	// Debug: Show initial robot positions and movements
+	fmt.Println("Initial Robots:")
+	for i, robot := range robots {
+		fmt.Printf("Robot %d: Initial(x=%d,y=%d) Velocity(vx=%d,vy=%d)\n",
+			i, robot.x, robot.y, robot.vx, robot.vy)
+	}
+
+	// Update robot positions
+	for i := range robots {
+		robots[i].UpdatePosition()
+	}
+
+	// Debug: Show final robot positions
+	fmt.Println("\nFinal Robots:")
+	for i, robot := range robots {
+		fmt.Printf("Robot %d: Final(x=%d,y=%d)\n", i, robot.x, robot.y)
+	}
+
+	// Count robots in quadrants
+	quadrantCounts := make([]int, 4)
 	for _, robot := range robots {
-		x, y := computePosition(robot, 100)
-		quadrant := determineQuadrant(x, y)
-		if quadrant != 0 { // Exclude middle point
+		quadrant := determineQuadrant(robot.x, robot.y)
+		if quadrant >= 0 {
 			quadrantCounts[quadrant]++
 		}
 	}
 
 	// Calculate safety factor
 	safetyFactor := 1
-	for i := 1; i <= 4; i++ {
-		safetyFactor *= quadrantCounts[i]
+	for _, count := range quadrantCounts {
+		safetyFactor *= count
 	}
 
-	fmt.Println("Safety Factor after 100 seconds:", safetyFactor)
+	// Print results
+	fmt.Println("\nQuadrant Counts:", quadrantCounts)
+	fmt.Println("Safety Factor:", safetyFactor)
 }
