@@ -4,95 +4,94 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"strings"
 )
 
-type Point struct {
-	x, y int
-}
-
-type State struct {
-	pos      Point
-	distance int
-	cheated  bool
-}
-
-var directions = []Point{
-	{-1, 0}, {1, 0}, {0, -1}, {0, 1},
-}
+const (
+	FileName = "inputdata.txt"
+	Size     = 141
+	Cutoff   = 100
+)
 
 func main() {
-	grid, start, end := readInput("inputdata.txt")
-	result := findShortestPath(grid, start, end)
-	fmt.Println("Shortest path with cheat:", result)
-}
-
-func readInput(filename string) ([][]rune, Point, Point) {
-	file, err := os.Open(filename)
+	file, err := os.Open(FileName)
 	if err != nil {
 		panic(err)
 	}
 	defer file.Close()
 
-	var grid [][]rune
-	var start, end Point
-
 	scanner := bufio.NewScanner(file)
-	for y := 0; scanner.Scan(); y++ {
+	mapData := make([][]rune, Size)
+	dist := make([][]int, Size)
+	for i := 0; i < Size; i++ {
+		mapData[i] = make([]rune, Size)
+		dist[i] = make([]int, Size)
+		for j := 0; j < Size; j++ {
+			dist[i][j] = -1
+		}
+	}
+
+	var sr, sc, er, ec int
+	for r := 0; r < Size; r++ {
+		scanner.Scan()
 		line := scanner.Text()
-		grid = append(grid, []rune(line))
-		if idx := strings.IndexRune(line, 'S'); idx != -1 {
-			start = Point{idx, y}
-		}
-		if idx := strings.IndexRune(line, 'E'); idx != -1 {
-			end = Point{idx, y}
+		for c := 0; c < Size; c++ {
+			mapData[r][c] = rune(line[c])
+			if mapData[r][c] == 'S' {
+				sr, sc = r, c
+			} else if mapData[r][c] == 'E' {
+				er, ec = r, c
+			}
 		}
 	}
 
-	if err := scanner.Err(); err != nil {
-		panic(err)
+	r, c := sr, sc
+	d := 0
+
+	// Traverse the path
+	for r != er || c != ec {
+		dist[r][c] = d
+		if r-1 >= 0 && mapData[r-1][c] != '#' && dist[r-1][c] == -1 {
+			r--
+		} else if c+1 < Size && mapData[r][c+1] != '#' && dist[r][c+1] == -1 {
+			c++
+		} else if r+1 < Size && mapData[r+1][c] != '#' && dist[r+1][c] == -1 {
+			r++
+		} else if c-1 >= 0 && mapData[r][c-1] != '#' && dist[r][c-1] == -1 {
+			c--
+		}
+		d++
+	}
+	dist[er][ec] = d
+
+	numCheats := 0
+
+	// Check for cheats
+	for r := 0; r < Size; r++ {
+		for c := 0; c < Size; c++ {
+			if c+2 < Size && mapData[r][c] != '#' && mapData[r][c+1] == '#' && mapData[r][c+2] != '#' {
+				var saved int
+				if dist[r][c] < dist[r][c+2] {
+					saved = dist[r][c+2] - (dist[r][c] + 2)
+				} else {
+					saved = dist[r][c] - (dist[r][c+2] + 2)
+				}
+				if saved >= Cutoff {
+					numCheats++
+				}
+			}
+			if r+2 < Size && mapData[r][c] != '#' && mapData[r+1][c] == '#' && mapData[r+2][c] != '#' {
+				var saved int
+				if dist[r][c] < dist[r+2][c] {
+					saved = dist[r+2][c] - (dist[r][c] + 2)
+				} else {
+					saved = dist[r][c] - (dist[r+2][c] + 2)
+				}
+				if saved >= Cutoff {
+					numCheats++
+				}
+			}
+		}
 	}
 
-	return grid, start, end
-}
-
-func findShortestPath(grid [][]rune, start, end Point) int {
-	rows, cols := len(grid), len(grid[0])
-	queue := []State{{pos: start, distance: 0, cheated: false}}
-	visited := make(map[State]bool)
-
-	for len(queue) > 0 {
-		cur := queue[0]
-		queue = queue[1:]
-
-		if cur.pos == end {
-			return cur.distance
-		}
-
-		if visited[cur] {
-			continue
-		}
-		visited[cur] = true
-
-		for _, d := range directions {
-			next := Point{cur.pos.x + d.x, cur.pos.y + d.y}
-			if next.x < 0 || next.x >= cols || next.y < 0 || next.y >= rows {
-				continue
-			}
-
-			cell := grid[next.y][next.x]
-			if cell == '#' && cur.cheated {
-				continue
-			}
-
-			newState := State{pos: next, distance: cur.distance + 1, cheated: cur.cheated}
-			if cell == '#' && !cur.cheated {
-				newState.cheated = true
-			}
-
-			queue = append(queue, newState)
-		}
-	}
-
-	return -1 // No path found
+	fmt.Println(numCheats)
 }

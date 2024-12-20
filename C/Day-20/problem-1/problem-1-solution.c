@@ -4,9 +4,6 @@
 #include <assert.h>
 
 #define INPUT
-
-
-
 #ifdef INPUT
 #define FILE_NAME "inputdata.txt"
 #define SIZE 141
