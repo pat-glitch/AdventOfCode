@@ -1,97 +1,100 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"os"
+	"strconv"
+	"strings"
 )
 
-const (
-	FileName = "inputdata.txt"
-	Size     = 141
-	Cutoff   = 100
-)
+// Keypad layout for the numeric keypad
+var numericKeypad = [][]string{
+	{"7", "8", "9"},
+	{"4", "5", "6"},
+	{"1", "2", "3"},
+	{"", "0", "A"},
+}
+
+// Directions for movement
+var directions = map[string][2]int{
+	"^": {-1, 0}, // Up
+	"v": {1, 0},  // Down
+	"<": {0, -1}, // Left
+	">": {0, 1},  // Right
+}
+
+// Validates if a position is within the bounds of the numeric keypad
+func isValidPosition(x, y int) bool {
+	if x < 0 || x >= len(numericKeypad) || y < 0 || y >= len(numericKeypad[0]) {
+		return false
+	}
+	return numericKeypad[x][y] != ""
+}
+
+// Finds the shortest path to type a number sequence on the numeric keypad
+func findShortestPath(code string) int {
+	startX, startY := 3, 2 // Start at the "A" key
+	sequenceLength := 0
+
+	for _, digit := range code {
+		target := string(digit)
+		steps, endX, endY := bfs(startX, startY, target)
+		sequenceLength += steps
+		startX, startY = endX, endY
+	}
+
+	return sequenceLength
+}
+
+// BFS to find shortest path to target key
+func bfs(startX, startY int, target string) (int, int, int) {
+	type state struct {
+		x, y, steps int
+	}
+	queue := []state{{startX, startY, 0}}
+	visited := make(map[[2]int]bool)
+	visited[[2]int{startX, startY}] = true
+
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+
+		if numericKeypad[current.x][current.y] == target {
+			return current.steps, current.x, current.y
+		}
+
+		for dir, delta := range directions {
+			nextX, nextY := current.x+delta[0], current.y+delta[1]
+			if isValidPosition(nextX, nextY) && !visited[[2]int{nextX, nextY}] {
+				visited[[2]int{nextX, nextY}] = true
+				queue = append(queue, state{nextX, nextY, current.steps + 1})
+			}
+		}
+	}
+
+	return 0, startX, startY // Should never reach here
+}
+
+// Calculate complexity for a single code
+func calculateComplexity(code string, sequenceLength int) int {
+	numericValue, _ := strconv.Atoi(strings.TrimLeft(code, "0"))
+	return sequenceLength * numericValue
+}
 
 func main() {
-	file, err := os.Open(FileName)
-	if err != nil {
-		panic(err)
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	mapData := make([][]rune, Size)
-	dist := make([][]int, Size)
-	for i := 0; i < Size; i++ {
-		mapData[i] = make([]rune, Size)
-		dist[i] = make([]int, Size)
-		for j := 0; j < Size; j++ {
-			dist[i][j] = -1
-		}
+	// Hardcoded input data
+	codes := []string{
+		"129A",
+		"974A",
+		"805A",
+		"671A",
+		"386A",
 	}
 
-	var sr, sc, er, ec int
-	for r := 0; r < Size; r++ {
-		scanner.Scan()
-		line := scanner.Text()
-		for c := 0; c < Size; c++ {
-			mapData[r][c] = rune(line[c])
-			if mapData[r][c] == 'S' {
-				sr, sc = r, c
-			} else if mapData[r][c] == 'E' {
-				er, ec = r, c
-			}
-		}
+	totalComplexity := 0
+	for _, code := range codes {
+		sequenceLength := findShortestPath(code)
+		totalComplexity += calculateComplexity(code, sequenceLength)
 	}
 
-	r, c := sr, sc
-	d := 0
-
-	// Traverse the path
-	for r != er || c != ec {
-		dist[r][c] = d
-		if r-1 >= 0 && mapData[r-1][c] != '#' && dist[r-1][c] == -1 {
-			r--
-		} else if c+1 < Size && mapData[r][c+1] != '#' && dist[r][c+1] == -1 {
-			c++
-		} else if r+1 < Size && mapData[r+1][c] != '#' && dist[r+1][c] == -1 {
-			r++
-		} else if c-1 >= 0 && mapData[r][c-1] != '#' && dist[r][c-1] == -1 {
-			c--
-		}
-		d++
-	}
-	dist[er][ec] = d
-
-	numCheats := 0
-
-	// Check for cheats
-	for r := 0; r < Size; r++ {
-		for c := 0; c < Size; c++ {
-			if c+2 < Size && mapData[r][c] != '#' && mapData[r][c+1] == '#' && mapData[r][c+2] != '#' {
-				var saved int
-				if dist[r][c] < dist[r][c+2] {
-					saved = dist[r][c+2] - (dist[r][c] + 2)
-				} else {
-					saved = dist[r][c] - (dist[r][c+2] + 2)
-				}
-				if saved >= Cutoff {
-					numCheats++
-				}
-			}
-			if r+2 < Size && mapData[r][c] != '#' && mapData[r+1][c] == '#' && mapData[r+2][c] != '#' {
-				var saved int
-				if dist[r][c] < dist[r+2][c] {
-					saved = dist[r+2][c] - (dist[r][c] + 2)
-				} else {
-					saved = dist[r][c] - (dist[r+2][c] + 2)
-				}
-				if saved >= Cutoff {
-					numCheats++
-				}
-			}
-		}
-	}
-
-	fmt.Println(numCheats)
+	fmt.Println("Total Complexity:", totalComplexity)
 }
