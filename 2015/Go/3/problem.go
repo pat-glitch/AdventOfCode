@@ -6,6 +6,7 @@ import (
 	"os"
 )
 
+// Position represents a coordinate on the grid
 type Position struct {
 	x, y int
 }
@@ -14,40 +15,52 @@ func main() {
 	// Open the input file
 	file, err := os.Open("inputdata.txt")
 	if err != nil {
-		fmt.Printf("Error opening the file: %v\n", err)
+		fmt.Println("Error opening file:", err)
 		return
 	}
 	defer file.Close()
 
+	// Read the input directions
 	scanner := bufio.NewScanner(file)
 	scanner.Scan()
 	directions := scanner.Text()
 
-	// Track visitd houses using a map
+	// Track visited houses using a map
 	visitedHouses := make(map[Position]bool)
 
-	// Santa's starting position
-	currentPosition := Position{0, 0}
-	visitedHouses[currentPosition] = true
+	// Starting positions for Santa and Robo-Santa
+	santaPosition := Position{0, 0}
+	roboPosition := Position{0, 0}
+	visitedHouses[santaPosition] = true
 
-	// Process each direction
-	for _, direction := range directions {
-		switch direction {
-		case '^':
-			currentPosition.y++
-		case 'v':
-			currentPosition.y--
-		case '>':
-			currentPosition.x++
-		case '<':
-			currentPosition.x--
+	// Process each direction alternately between Santa and Robo-Santa
+	for i, direction := range directions {
+		if i%2 == 0 {
+			santaPosition = move(santaPosition, direction)
+			visitedHouses[santaPosition] = true
+		} else {
+			roboPosition = move(roboPosition, direction)
+			visitedHouses[roboPosition] = true
 		}
-		visitedHouses[currentPosition] = true
 	}
 
 	// Count the number of unique houses visited
 	numberOfHouses := len(visitedHouses)
 
-	// Print the result
-	fmt.Println("No. of houses that recieve at least one present:", numberOfHouses)
+	fmt.Println("Number of houses that receive at least one present:", numberOfHouses)
+}
+
+// move updates the position based on the given direction
+func move(pos Position, direction rune) Position {
+	switch direction {
+	case '^':
+		pos.y++
+	case 'v':
+		pos.y--
+	case '>':
+		pos.x++
+	case '<':
+		pos.x--
+	}
+	return pos
 }
